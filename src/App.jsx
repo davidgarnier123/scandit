@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Package, Trash2, Camera, X, Pause, Play } from 'lucide-react';
+import { Package, Trash2, Camera, X } from 'lucide-react';
 import { useScandit } from './hooks/useScandit';
 import ReloadPrompt from './ReloadPrompt';
 import './index.css';
@@ -12,7 +12,6 @@ function App() {
   const [scannerOpen, setScannerOpen] = useState(false);
   const containerRef = useRef(null);
 
-  // Scan handler - stable reference
   const handleScan = useCallback((barcode) => {
     if (navigator.vibrate) navigator.vibrate(100);
 
@@ -24,48 +23,26 @@ function App() {
     });
   }, []);
 
-  const {
-    isReady,
-    isActive,
-    mountScanner,
-    startScanning,
-    pauseScanning,
-    resumeScanning,
-    unmountScanner
-  } = useScandit(handleScan);
+  const { isReady, showScanner, hideScanner } = useScandit(handleScan);
 
-  // Open scanner: mount then start
-  const openScanner = useCallback(async () => {
+  // Open scanner
+  const openScanner = useCallback(() => {
     setScannerOpen(true);
   }, []);
 
-  // Effect to mount and start scanner when container is ready
+  // Mount scanner when opened
   useEffect(() => {
     if (scannerOpen && containerRef.current && isReady) {
-      mountScanner(containerRef.current);
-      // Small delay to ensure mount is complete
-      setTimeout(() => {
-        startScanning();
-      }, 100);
+      showScanner(containerRef.current);
     }
-  }, [scannerOpen, isReady, mountScanner, startScanning]);
+  }, [scannerOpen, isReady, showScanner]);
 
-  // Close scanner: stop and unmount
+  // Close scanner
   const closeScanner = useCallback(async () => {
-    await unmountScanner();
+    await hideScanner();
     setScannerOpen(false);
-  }, [unmountScanner]);
+  }, [hideScanner]);
 
-  // Toggle pause/resume
-  const togglePause = useCallback(async () => {
-    if (isActive) {
-      await pauseScanning();
-    } else {
-      await resumeScanning();
-    }
-  }, [isActive, pauseScanning, resumeScanning]);
-
-  // Clear inventory
   const clearInventory = () => {
     if (window.confirm('Vider l\'inventaire ?')) {
       setInventory([]);
@@ -75,39 +52,23 @@ function App() {
 
   return (
     <>
-      {/* Scanner View - always in DOM, visibility controlled by CSS */}
+      {/* Scanner - SparkScan handles its own UI */}
       <div className={`scanner-fullscreen ${scannerOpen ? 'visible' : ''}`}>
         <div className="scanner-container" ref={containerRef}></div>
 
-        {/* Bottom controls */}
-        <div className="scanner-controls">
-          <button className="scanner-btn pause" onClick={togglePause}>
-            {isActive ? <Pause size={24} /> : <Play size={24} />}
-            <span>{isActive ? 'PAUSE' : 'REPRENDRE'}</span>
-          </button>
-          <button className="scanner-btn close" onClick={closeScanner}>
-            <X size={24} />
-            <span>FERMER</span>
-          </button>
-        </div>
+        {/* Just a close button */}
+        <button className="close-scanner-btn" onClick={closeScanner}>
+          <X size={20} />
+          <span>Fermer</span>
+        </button>
 
-        {/* Scanned items overlay */}
-        <div className="scanner-results">
-          <div className="results-header">
-            <span>{inventory.length} article{inventory.length !== 1 ? 's' : ''} scanné{inventory.length !== 1 ? 's' : ''}</span>
-          </div>
-          <div className="results-list">
-            {inventory.slice(0, 5).map((item) => (
-              <div key={item.id} className="result-item">
-                <span className="result-data">{item.data}</span>
-                <span className="result-time">{new Date(item.timestamp).toLocaleTimeString()}</span>
-              </div>
-            ))}
-          </div>
+        {/* Small counter */}
+        <div className="scan-counter">
+          {inventory.length} scanné{inventory.length !== 1 ? 's' : ''}
         </div>
       </div>
 
-      {/* Home View */}
+      {/* Home */}
       <div className={`app-container ${scannerOpen ? 'hidden' : ''}`}>
         <ReloadPrompt />
 
@@ -125,17 +86,15 @@ function App() {
             <div className="empty-state">
               <Package size={48} />
               <p>Aucun article</p>
-              <p className="empty-hint">Appuyez sur Scanner pour commencer</p>
+              <p className="empty-hint">Appuyez sur Scanner</p>
             </div>
           ) : (
             inventory.map((item) => (
               <div key={item.id} className="inventory-card">
-                <div className="card-content">
-                  <span className="card-data">{item.data}</span>
-                  <span className="card-meta">
-                    {item.symbology.replace('sy-', '').toUpperCase()} • {new Date(item.timestamp).toLocaleTimeString()}
-                  </span>
-                </div>
+                <span className="card-data">{item.data}</span>
+                <span className="card-meta">
+                  {new Date(item.timestamp).toLocaleTimeString()}
+                </span>
               </div>
             ))
           )}

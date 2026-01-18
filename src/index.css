@@ -159,7 +159,6 @@ body {
   inset: 0;
   background: black;
   z-index: 1000;
-  /* Hidden by default */
   display: none;
   pointer-events: none;
 }
@@ -173,105 +172,42 @@ body {
   display: none;
 }
 
-
 .scanner-container {
   position: absolute;
   inset: 0;
 }
 
-.scanner-controls {
+.close-scanner-btn {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 1rem;
-  padding-bottom: max(env(safe-area-inset-bottom), 1rem);
+  top: max(env(safe-area-inset-top), 12px);
+  right: 12px;
+  z-index: 1002;
   display: flex;
-  gap: 0.75rem;
-  justify-content: center;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.9));
-  z-index: 1001;
-}
-
-.scanner-btn {
-  display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 0.25rem;
-  background: rgba(255, 255, 255, 0.15);
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.2);
   color: white;
-  padding: 0.75rem 1.25rem;
-  border-radius: 12px;
-  font-size: 0.7rem;
+  padding: 8px 14px;
+  border-radius: 20px;
+  font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
-  min-width: 80px;
 }
 
-.scanner-btn.pause {
-  background: var(--primary);
-  border-color: var(--primary);
-}
-
-.scanner-btn.close {
-  background: rgba(239, 68, 68, 0.8);
-  border-color: rgba(239, 68, 68, 0.5);
-}
-
-/* ========== SCANNER RESULTS OVERLAY ========== */
-.scanner-results {
+.scan-counter {
   position: fixed;
-  bottom: 100px;
-  left: 1rem;
-  max-width: 180px;
-  background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-radius: var(--radius);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  z-index: 1001;
-  overflow: hidden;
-}
-
-.results-header {
-  padding: 0.4rem 0.6rem;
-  font-size: 0.7rem;
+  top: max(env(safe-area-inset-top), 12px);
+  left: 12px;
+  z-index: 1002;
+  background: var(--primary);
+  color: white;
+  padding: 8px 14px;
+  border-radius: 20px;
+  font-size: 0.8rem;
   font-weight: 600;
-  color: var(--primary-hover);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.results-list {
-  max-height: 100px;
-  overflow-y: auto;
-}
-
-.result-item {
-  padding: 0.35rem 0.6rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  font-size: 0.7rem;
-}
-
-.result-item:last-child {
-  border-bottom: none;
-}
-
-.result-data {
-  font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.result-time {
-  color: var(--text-muted);
-  font-size: 0.6rem;
 }
 
 /* ========== PWA TOAST ========== */
