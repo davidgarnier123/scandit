@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
 import { Search, Package, Trash2, Camera } from 'lucide-react';
 import { useScandit } from './hooks/useScandit';
+import ReloadPrompt from './ReloadPrompt';
 import './index.css';
 
 function App() {
@@ -35,7 +35,8 @@ function App() {
 
   const startScanning = async () => {
     setIsScanning(true);
-    const view = createView(document.body);
+    const container = document.getElementById('scandit-container');
+    const view = createView(container);
     if (view) {
       setActiveView(view);
       await view.prepareScanning();
@@ -60,7 +61,10 @@ function App() {
 
   return (
     <div className="app-container">
+      <ReloadPrompt />
+      <div id="scandit-container"></div>
       <header className="header">
+
         <h1 style={{
           fontSize: '1.25rem',
           fontWeight: '700',
