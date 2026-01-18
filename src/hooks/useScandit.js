@@ -2,11 +2,9 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import {
     DataCaptureContext,
     Camera,
+    CameraPosition,
     DataCaptureView,
-    FrameSourceState,
-    RectangularViewfinder,
-    RectangularViewfinderStyle,
-    RectangularViewfinderLineStyle
+    FrameSourceState
 } from "@scandit/web-datacapture-core";
 import {
     BarcodeCapture,
@@ -49,10 +47,7 @@ export const useScandit = (onScan) => {
                 // 2. Configure Barcode Capture Settings
                 const settings = new BarcodeCaptureSettings();
                 settings.enableSymbologies([Symbology.Code128]);
-
-                // Duplicate filter: avoid scanning same code repeatedly (-1 = never rescan same code)
-                // Set to 0 to allow immediate rescans
-                settings.codeDuplicateFilter = 500; // 500ms cooldown between same codes
+                settings.codeDuplicateFilter = 500;
 
                 // 3. Create BarcodeCapture instance
                 const barcodeCapture = await BarcodeCapture.forContext(context, settings);
@@ -71,16 +66,19 @@ export const useScandit = (onScan) => {
                     },
                 });
 
-                // 5. Setup Camera
-                const cameraSettings = BarcodeCapture.recommendedCameraSettings;
-                const camera = Camera.default;
+                // 5. Setup Camera - use atPosition to get back camera
+                const camera = Camera.atPosition(CameraPosition.WorldFacing);
                 if (camera) {
+                    const cameraSettings = BarcodeCapture.recommendedCameraSettings;
                     await camera.applySettings(cameraSettings);
                     await context.setFrameSource(camera);
+                    cameraRef.current = camera;
+                    console.log("Camera configured");
+                } else {
+                    console.error("No camera found");
                 }
 
                 contextRef.current = context;
-                cameraRef.current = camera;
                 barcodeCaptureRef.current = barcodeCapture;
                 setIsReady(true);
                 console.log("BarcodeCapture initialized");
