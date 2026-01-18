@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { Package, Trash2, Camera, X } from 'lucide-react';
 import { useScandit } from './hooks/useScandit';
 import ReloadPrompt from './ReloadPrompt';
@@ -23,25 +23,24 @@ function App() {
     });
   }, []);
 
-  const { isReady, showScanner, hideScanner } = useScandit(handleScan);
+  const { isReady, isScanning, startScanning, stopScanning } = useScandit(handleScan);
 
   // Open scanner
-  const openScanner = useCallback(() => {
+  const openScanner = useCallback(async () => {
     setScannerOpen(true);
-  }, []);
-
-  // Mount scanner when opened
-  useEffect(() => {
-    if (scannerOpen && containerRef.current && isReady) {
-      showScanner(containerRef.current);
-    }
-  }, [scannerOpen, isReady, showScanner]);
+    // Small delay for DOM to be ready
+    setTimeout(() => {
+      if (containerRef.current) {
+        startScanning(containerRef.current);
+      }
+    }, 50);
+  }, [startScanning]);
 
   // Close scanner
   const closeScanner = useCallback(async () => {
-    await hideScanner();
+    await stopScanning();
     setScannerOpen(false);
-  }, [hideScanner]);
+  }, [stopScanning]);
 
   const clearInventory = () => {
     if (window.confirm('Vider l\'inventaire ?')) {
@@ -52,23 +51,21 @@ function App() {
 
   return (
     <>
-      {/* Scanner - SparkScan handles its own UI */}
+      {/* Scanner View */}
       <div className={`scanner-fullscreen ${scannerOpen ? 'visible' : ''}`}>
         <div className="scanner-container" ref={containerRef}></div>
 
-        {/* Just a close button */}
         <button className="close-scanner-btn" onClick={closeScanner}>
           <X size={20} />
           <span>Fermer</span>
         </button>
 
-        {/* Small counter */}
         <div className="scan-counter">
           {inventory.length} scanné{inventory.length !== 1 ? 's' : ''}
         </div>
       </div>
 
-      {/* Home */}
+      {/* Home View */}
       <div className={`app-container ${scannerOpen ? 'hidden' : ''}`}>
         <ReloadPrompt />
 

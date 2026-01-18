@@ -1,25 +1,35 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { DataCaptureContext } from "@scandit/web-datacapture-core";
 import {
-    SparkScan,
-    SparkScanSettings,
-    SparkScanView,
-    SparkScanViewSettings,
+    DataCaptureContext,
+    Camera,
+    DataCaptureView,
+    FrameSourceState,
+    RectangularViewfinder,
+    RectangularViewfinderStyle,
+    RectangularViewfinderLineStyle
+} from "@scandit/web-datacapture-core";
+import {
+    BarcodeCapture,
+    BarcodeCaptureSettings,
+    BarcodeCaptureOverlay,
+    BarcodeCaptureOverlayStyle,
     Symbology,
-    barcodeCaptureLoader,
-    SparkScanBarcodeSuccessFeedback
+    barcodeCaptureLoader
 } from "@scandit/web-datacapture-barcode";
 
 const LICENSE_KEY = "Aplm1QpULSQXAyefS+LamLYrRrRhHEGWgzHT60QpNI2mGknMjEwJYihCrACBVJ3e1E+mwutGs94CGNdCyWgDpGEiQJOiS2AueCkbA4soubrcAMxQiChIMDEWsNxifsAd3n18MzRfOMYVRVypA20kTMtaOwQTdHZllFpbgMJQMGr9dGvTVVPAqwpe7zM9axlgHW7ivT9W8uzrR/FCmHuROqNtso1OTz1KqQiQKMpYiFKTX8m9TkVnndFz+zJ7FMDZZ25lcVZkflf7ROD/Q0d0+QlXVqiwZYjSiHISLF5ggKRPf1yND2lWyJplAe1ieU2Od0/2AiZskMYEIKVYXw8sotw594sUS/MBTQI2zZtyDa59EXCeN1iySSMkb4QlVFNpegeSu6l/tJpLfxd+8USg/PYxycVNUf/Y+08Wu3VrzRUHXbmrPlMPn+8tqwtMZSVYeSMYFA1cBf2UaIY/vVzwCclEufOTaz/oT3/UG4xd8hW+bSeLYkIefwseHpj/MZPFn3b7nFl4JlkkBz6LigyHXhUyciOiVDOaxuFaeGCWGNRgsbAAYbpaG1w+Obv4HWVEqEgT8ln+TuoqN2oEV4JnTYKrxKeG8H5Nf10b7TuML7SjDKsz/1+8mtMgFi7eEQfTIp5L0O4ijwPCfm5sT70VcNkbYY/rgNJ2DOlIFC6t3cNsPN11TZGIqznd9XaBTmKcfBH7/5+FA0bXH7rWyc+B/JpUPUPLuXMB6kj6Lg2/EkfizLezx29aT9wSFp6YnMj4Ih8d++Oj7FzfuGslH4ErTEBhAczloBfXA9xOftPU6VEr+ejZB2HpuXNKB6Fyfe2Gt6FdtevhpzmtrAlPheNbOnqAyEcyUE/v84RTnyUFKVxLaTA6glRnnkVz6Nzl85HTP0VwzbaGqNf4JrexKYp51iwXoSOzBnp7BHSFyEDdbDu8o6xRpKK8beoVtyV4nGAwNZxOPB30SeEJXkk6v9PqzLac82M9eb5ZQ6ncv7SkIBAVXUMsGqoMtCp7vNDa0MXrYG+0ecSNBs99U8HMpxr0FaIapPDwi3J7GYBFs5oMW3FXZ+BaRKfhPtZZVnszVqX6mIlacWD8lBZyw8T0YTslYt5CqrfBZNQ99vqNxYquUXyELhUqrryZwnNGSroCpcEMKufauRN0gNdTP8o6bpLHCA/+vmkM0ANMwZ4nAbJ1SfbbViqyN77sTQtSTzaRKu0O+bo=";
 
 /**
- * Simple Scandit SparkScan Hook
- * Uses SparkScan's default UI - no custom controls
+ * Scandit BarcodeCapture Hook
+ * Uses the standard BarcodeCapture API for continuous scanning
  */
 export const useScandit = (onScan) => {
     const [isReady, setIsReady] = useState(false);
+    const [isScanning, setIsScanning] = useState(false);
+
     const contextRef = useRef(null);
-    const sparkScanRef = useRef(null);
+    const cameraRef = useRef(null);
+    const barcodeCaptureRef = useRef(null);
     const viewRef = useRef(null);
     const onScanRef = useRef(onScan);
 
@@ -27,22 +37,30 @@ export const useScandit = (onScan) => {
         onScanRef.current = onScan;
     }, [onScan]);
 
-    // Initialize Scandit SDK once
+    // Initialize Scandit SDK
     useEffect(() => {
         const init = async () => {
             try {
+                // 1. Create Data Capture Context
                 const context = await DataCaptureContext.forLicenseKey(LICENSE_KEY, {
                     libraryLocation: "https://cdn.jsdelivr.net/npm/@scandit/web-datacapture-barcode@latest/sdc-lib/",
                     moduleLoaders: [barcodeCaptureLoader()],
                 });
 
-                const settings = new SparkScanSettings();
+                // 2. Configure Barcode Capture Settings
+                const settings = new BarcodeCaptureSettings();
                 settings.enableSymbologies([Symbology.Code128]);
 
-                const sparkScan = SparkScan.forSettings(settings);
+                // Duplicate filter: avoid scanning same code repeatedly (-1 = never rescan same code)
+                // Set to 0 to allow immediate rescans
+                settings.codeDuplicateFilter = 500; // 500ms cooldown between same codes
 
-                sparkScan.addListener({
-                    didScan: (_, session) => {
+                // 3. Create BarcodeCapture instance
+                const barcodeCapture = await BarcodeCapture.forContext(context, settings);
+
+                // 4. Add scan listener
+                barcodeCapture.addListener({
+                    didScan: (bc, session) => {
                         const barcode = session.newlyRecognizedBarcode;
                         if (barcode && onScanRef.current) {
                             onScanRef.current({
@@ -54,9 +72,19 @@ export const useScandit = (onScan) => {
                     },
                 });
 
+                // 5. Setup Camera
+                const cameraSettings = BarcodeCapture.recommendedCameraSettings;
+                const camera = Camera.default;
+                if (camera) {
+                    await camera.applySettings(cameraSettings);
+                    await context.setFrameSource(camera);
+                }
+
                 contextRef.current = context;
-                sparkScanRef.current = sparkScan;
+                cameraRef.current = camera;
+                barcodeCaptureRef.current = barcodeCapture;
                 setIsReady(true);
+                console.log("BarcodeCapture initialized");
             } catch (error) {
                 console.error("Scandit init error:", error);
             }
@@ -64,50 +92,67 @@ export const useScandit = (onScan) => {
         init();
 
         return () => {
+            if (cameraRef.current) {
+                cameraRef.current.switchToDesiredState(FrameSourceState.Off);
+            }
             if (viewRef.current) {
-                viewRef.current.stopScanning();
-                viewRef.current.detach();
+                viewRef.current.detachFromElement();
             }
         };
     }, []);
 
     /**
-     * Show the SparkScan scanner with DEFAULT UI
+     * Start scanning - creates view and turns on camera
      */
-    const showScanner = useCallback((container) => {
-        if (!isReady || !container || viewRef.current) return;
+    const startScanning = useCallback(async (container) => {
+        if (!isReady || !container) return;
 
-        // Use default settings - SparkScan knows best
-        const viewSettings = new SparkScanViewSettings();
+        // Create DataCaptureView
+        const view = await DataCaptureView.forContext(contextRef.current);
+        view.connectToElement(container);
 
-        // Enable continuous scanning toggle in UI
-        viewSettings.scanningBehaviorButtonVisible = true;
-
-        const view = SparkScanView.forElement(
-            container,
-            contextRef.current,
-            sparkScanRef.current,
-            viewSettings
+        // Add overlay for visual feedback
+        await BarcodeCaptureOverlay.withBarcodeCaptureForView(
+            barcodeCaptureRef.current,
+            view
         );
 
-        // Success feedback
-        view.feedbackDelegate = {
-            feedbackForBarcode: () => new SparkScanBarcodeSuccessFeedback(),
-        };
-
         viewRef.current = view;
+
+        // Turn on camera
+        if (cameraRef.current) {
+            await cameraRef.current.switchToDesiredState(FrameSourceState.On);
+        }
+
+        // Enable barcode capture
+        await barcodeCaptureRef.current.setEnabled(true);
+        setIsScanning(true);
+        console.log("Scanning started");
     }, [isReady]);
 
     /**
-     * Hide the scanner
+     * Stop scanning - turns off camera
      */
-    const hideScanner = useCallback(async () => {
+    const stopScanning = useCallback(async () => {
+        // Disable barcode capture
+        if (barcodeCaptureRef.current) {
+            await barcodeCaptureRef.current.setEnabled(false);
+        }
+
+        // Turn off camera
+        if (cameraRef.current) {
+            await cameraRef.current.switchToDesiredState(FrameSourceState.Off);
+        }
+
+        // Detach view
         if (viewRef.current) {
-            await viewRef.current.stopScanning();
-            viewRef.current.detach();
+            viewRef.current.detachFromElement();
             viewRef.current = null;
         }
+
+        setIsScanning(false);
+        console.log("Scanning stopped");
     }, []);
 
-    return { isReady, showScanner, hideScanner };
+    return { isReady, isScanning, startScanning, stopScanning };
 };
