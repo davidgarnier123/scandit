@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import {
     DataCaptureContext,
     Camera,
-    CameraPosition,
     DataCaptureView,
     FrameSourceState
 } from "@scandit/web-datacapture-core";
@@ -18,7 +17,6 @@ const LICENSE_KEY = "Aplm1QpULSQXAyefS+LamLYrRrRhHEGWgzHT60QpNI2mGknMjEwJYihCrAC
 
 /**
  * Scandit BarcodeCapture Hook
- * Uses the standard BarcodeCapture API for continuous scanning
  */
 export const useScandit = (onScan) => {
     const [isReady, setIsReady] = useState(false);
@@ -38,11 +36,14 @@ export const useScandit = (onScan) => {
     useEffect(() => {
         const init = async () => {
             try {
+                console.log("Initializing Scandit...");
+
                 // 1. Create Data Capture Context
                 const context = await DataCaptureContext.forLicenseKey(LICENSE_KEY, {
                     libraryLocation: "https://cdn.jsdelivr.net/npm/@scandit/web-datacapture-barcode@latest/sdc-lib/",
                     moduleLoaders: [barcodeCaptureLoader()],
                 });
+                console.log("Context created");
 
                 // 2. Configure Barcode Capture Settings
                 const settings = new BarcodeCaptureSettings();
@@ -51,6 +52,7 @@ export const useScandit = (onScan) => {
 
                 // 3. Create BarcodeCapture instance
                 const barcodeCapture = await BarcodeCapture.forContext(context, settings);
+                console.log("BarcodeCapture created");
 
                 // 4. Add scan listener
                 barcodeCapture.addListener({
@@ -66,22 +68,24 @@ export const useScandit = (onScan) => {
                     },
                 });
 
-                // 5. Setup Camera - use atPosition to get back camera
-                const camera = Camera.atPosition(CameraPosition.WorldFacing);
+                // 5. Setup Camera
+                const camera = Camera.default;
+                console.log("Camera.default:", camera);
+
                 if (camera) {
                     const cameraSettings = BarcodeCapture.recommendedCameraSettings;
                     await camera.applySettings(cameraSettings);
                     await context.setFrameSource(camera);
                     cameraRef.current = camera;
-                    console.log("Camera configured");
+                    console.log("Camera configured successfully");
                 } else {
-                    console.error("No camera found");
+                    console.error("Camera.default returned null");
                 }
 
                 contextRef.current = context;
                 barcodeCaptureRef.current = barcodeCapture;
                 setIsReady(true);
-                console.log("BarcodeCapture initialized");
+                console.log("BarcodeCapture ready!");
             } catch (error) {
                 console.error("Scandit init error:", error);
             }
