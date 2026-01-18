@@ -12,7 +12,6 @@ import {
     BarcodeCapture,
     BarcodeCaptureSettings,
     BarcodeCaptureOverlay,
-    BarcodeCaptureOverlayStyle,
     Symbology,
     barcodeCaptureLoader
 } from "@scandit/web-datacapture-barcode";
