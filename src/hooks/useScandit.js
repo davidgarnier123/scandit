@@ -6,7 +6,8 @@ import {
     SparkScanView,
     SparkScanViewSettings,
     Symbology,
-    barcodeCaptureLoader
+    barcodeCaptureLoader,
+    SparkScanBarcodeSuccessFeedback
 } from "@scandit/web-datacapture-barcode";
 
 // Replace with your actual license key
@@ -63,12 +64,22 @@ export const useScandit = (onScan) => {
         if (!sparkScan || !context) return null;
 
         const viewSettings = new SparkScanViewSettings();
+        // Enable continuous scanning by default and show the button to switch behavior
+        viewSettings.scanningBehaviorButtonVisible = true;
+
         const sparkScanView = SparkScanView.forElement(
             element,
             context,
             sparkScan,
             viewSettings
         );
+
+        // Optional: Add feedback for successful scan to confirm it captured
+        sparkScanView.feedbackDelegate = {
+            getFeedbackForBarcode: (barcode) => {
+                return new SparkScanBarcodeSuccessFeedback();
+            },
+        };
 
         return sparkScanView;
     };
