@@ -109,6 +109,9 @@ export const useScandit = (onScan) => {
             SparkScanPreviewBehavior.Persistent
         );
 
+        // DISABLE inactivity timeout: -1 means infinite (no auto-stop)
+        viewSettings.inactiveStateTimeout = -1;
+
         // Create the SparkScan View
         const view = SparkScanView.forElement(
             container,
