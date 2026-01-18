@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Search, Package, Trash2, Camera } from 'lucide-react';
 import { useScandit } from './hooks/useScandit';
 import ReloadPrompt from './ReloadPrompt';
@@ -11,11 +11,11 @@ function App() {
   });
   const [isScanning, setIsScanning] = useState(false);
   const [activeView, setActiveView] = useState(null);
+  const containerRef = useRef(null);
 
   const [lastScannedId, setLastScannedId] = useState(null);
 
   const handleScan = (barcode) => {
-    // Haptic feedback for mobile
     if (navigator.vibrate) {
       navigator.vibrate(100);
     }
@@ -28,19 +28,22 @@ function App() {
     });
 
     setLastScannedId(newItem.id);
-    // Remove highlight after animation
     setTimeout(() => setLastScannedId(null), 1000);
   };
 
   const { createView } = useScandit(handleScan);
 
   const startScanning = async () => {
+    if (!containerRef.current) return;
+
     setIsScanning(true);
-    const container = document.getElementById('scandit-container');
-    const view = createView(container);
+    // Use the ref directly to avoid DOM lookups and stay stable
+    const view = createView(containerRef.current);
     if (view) {
       setActiveView(view);
       await view.prepareScanning();
+      // Hands-Free: Start the scanning loop immediately
+      await view.startScanning();
     }
   };
 
@@ -63,9 +66,14 @@ function App() {
   return (
     <div className="app-container">
       <ReloadPrompt />
-      <div id="scandit-container"></div>
-      <header className="header">
+      {/* Hidden/Fixed container for Scandit view */}
+      <div
+        id="scandit-container"
+        ref={containerRef}
+        style={{ display: isScanning ? 'block' : 'none' }}
+      ></div>
 
+      <header className="header">
         <h1 style={{
           fontSize: '1.25rem',
           fontWeight: '700',
@@ -156,3 +164,4 @@ function App() {
 }
 
 export default App;
+

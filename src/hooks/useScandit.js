@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { DataCaptureContext } from "@scandit/web-datacapture-core";
 import {
     SparkScan,
@@ -11,16 +11,19 @@ import {
     SparkScanScanningBehavior
 } from "@scandit/web-datacapture-barcode";
 
-// Replace with your actual license key
 const LICENSE_KEY = "Aplm1QpULSQXAyefS+LamLYrRrRhHEGWgzHT60QpNI2mGknMjEwJYihCrACBVJ3e1E+mwutGs94CGNdCyWgDpGEiQJOiS2AueCkbA4soubrcAMxQiChIMDEWsNxifsAd3n18MzRfOMYVRVypA20kTMtaOwQTdHZllFpbgMJQMGr9dGvTVVPAqwpe7zM9axlgHW7ivT9W8uzrR/FCmHuROqNtso1OTz1KqQiQKMpYiFKTX8m9TkVnndFz+zJ7FMDZZ25lcVZkflf7ROD/Q0d0+QlXVqiwZYjSiHISLF5ggKRPf1yND2lWyJplAe1ieU2Od0/2AiZskMYEIKVYXw8sotw594sUS/MBTQI2zZtyDa59EXCeN1iySSMkb4QlVFNpegeSu6l/tJpLfxd+8USg/PYxycVNUf/Y+08Wu3VrzRUHXbmrPlMPn+8tqwtMZSVYeSMYFA1cBf2UaIY/vVzwCclEufOTaz/oT3/UG4xd8hW+bSeLYkIefwseHpj/MZPFn3b7nFl4JlkkBz6LigyHXhUyciOiVDOaxuFaeGCWGNRgsbAAYbpaG1w+Obv4HWVEqEgT8ln+TuoqN2oEV4JnTYKrxKeG8H5Nf10b7TuML7SjDKsz/1+8mtMgFi7eEQfTIp5L0O4ijwPCfm5sT70VcNkbYY/rgNJ2DOlIFC6t3cNsPN11TZGIqznd9XaBTmKcfBH7/5+FA0bXH7rWyc+B/JpUPUPLuXMB6kj6Lg2/EkfizLezx29aT9wSFp6YnMj4Ih8d++Oj7FzfuGslH4ErTEBhAczloBfXA9xOftPU6VEr+ejZB2HpuXNKB6Fyfe2Gt6FdtevhpzmtrAlPheNbOnqAyEcyUE/v84RTnyUFKVxLaTA6glRnnkVz6Nzl85HTP0VwzbaGqNf4JrexKYp51iwXoSOzBnp7BHSFyEDdbDu8o6xRpKK8beoVtyV4nGAwNZxOPB30SeEJXkk6v9PqzLac82M9eb5ZQ6ncv7SkIBAVXUMsGqoMtCp7vNDa0MXrYG+0ecSNBs99U8HMpxr0FaIapPDwi3J7GYBFs5oMW3FXZ+BaRKfhPtZZVnszVqX6mIlacWD8lBZyw8T0YTslYt5CqrfBZNQ99vqNxYquUXyELhUqrryZwnNGSroCpcEMKufauRN0gNdTP8o6bpLHCA/+vmkM0ANMwZ4nAbJ1SfbbViqyN77sTQtSTzaRKu0O+bo=";
 
 export const useScandit = (onScan) => {
     const [sparkScan, setSparkScan] = useState(null);
     const [context, setContext] = useState(null);
+    const onScanRef = useRef(onScan);
+
+    // Keep the scan callback updated without re-triggering the main effect
+    useEffect(() => {
+        onScanRef.current = onScan;
+    }, [onScan]);
 
     useEffect(() => {
-        let view = null;
-
         const initScandit = async () => {
             try {
                 const dataCaptureContext = await DataCaptureContext.forLicenseKey(LICENSE_KEY, {
@@ -36,8 +39,8 @@ export const useScandit = (onScan) => {
                 sparkScanInstance.addListener({
                     didScan: (sparkScan, session) => {
                         const barcode = session.newlyRecognizedBarcode;
-                        if (barcode) {
-                            onScan({
+                        if (barcode && onScanRef.current) {
+                            onScanRef.current({
                                 data: barcode.data,
                                 symbology: barcode.symbology,
                                 timestamp: new Date().toISOString()
@@ -54,22 +57,22 @@ export const useScandit = (onScan) => {
         };
 
         initScandit();
-
-        return () => {
-            // Cleanup handled in component unmount usually, 
-            // but we could stop scanning here if needed.
-        };
     }, []);
 
     const createView = (element) => {
         if (!sparkScan || !context) return null;
 
         const viewSettings = new SparkScanViewSettings();
-        // Force continuous scanning behavior
-        viewSettings.scanningBehavior = SparkScanScanningBehavior.Continuous;
-        // Disable hold-to-scan so a tap starts a continuous session
+
+        // Use HandFree mode if available, otherwise fallback to Continuous
+        // HandFree is available in version 6.22+ and keeps the scanner active indefinitely
+        if (SparkScanScanningBehavior.HandFree) {
+            viewSettings.scanningBehavior = SparkScanScanningBehavior.HandFree;
+        } else {
+            viewSettings.scanningBehavior = SparkScanScanningBehavior.Continuous;
+        }
+
         viewSettings.holdToScanEnabled = false;
-        // Enable the button to switch behavior just in case
         viewSettings.scanningBehaviorButtonVisible = true;
 
         const sparkScanView = SparkScanView.forElement(
@@ -79,7 +82,6 @@ export const useScandit = (onScan) => {
             viewSettings
         );
 
-        // Optional: Add feedback for successful scan to confirm it captured
         sparkScanView.feedbackDelegate = {
             getFeedbackForBarcode: (barcode) => {
                 return new SparkScanBarcodeSuccessFeedback();
@@ -91,3 +93,4 @@ export const useScandit = (onScan) => {
 
     return { sparkScan, context, createView };
 };
+
