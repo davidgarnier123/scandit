@@ -15,31 +15,46 @@ import {
 
 const LICENSE_KEY = "Aplm1QpULSQXAyefS+LamLYrRrRhHEGWgzHT60QpNI2mGknMjEwJYihCrACBVJ3e1E+mwutGs94CGNdCyWgDpGEiQJOiS2AueCkbA4soubrcAMxQiChIMDEWsNxifsAd3n18MzRfOMYVRVypA20kTMtaOwQTdHZllFpbgMJQMGr9dGvTVVPAqwpe7zM9axlgHW7ivT9W8uzrR/FCmHuROqNtso1OTz1KqQiQKMpYiFKTX8m9TkVnndFz+zJ7FMDZZ25lcVZkflf7ROD/Q0d0+QlXVqiwZYjSiHISLF5ggKRPf1yND2lWyJplAe1ieU2Od0/2AiZskMYEIKVYXw8sotw594sUS/MBTQI2zZtyDa59EXCeN1iySSMkb4QlVFNpegeSu6l/tJpLfxd+8USg/PYxycVNUf/Y+08Wu3VrzRUHXbmrPlMPn+8tqwtMZSVYeSMYFA1cBf2UaIY/vVzwCclEufOTaz/oT3/UG4xd8hW+bSeLYkIefwseHpj/MZPFn3b7nFl4JlkkBz6LigyHXhUyciOiVDOaxuFaeGCWGNRgsbAAYbpaG1w+Obv4HWVEqEgT8ln+TuoqN2oEV4JnTYKrxKeG8H5Nf10b7TuML7SjDKsz/1+8mtMgFi7eEQfTIp5L0O4ijwPCfm5sT70VcNkbYY/rgNJ2DOlIFC6t3cNsPN11TZGIqznd9XaBTmKcfBH7/5+FA0bXH7rWyc+B/JpUPUPLuXMB6kj6Lg2/EkfizLezx29aT9wSFp6YnMj4Ih8d++Oj7FzfuGslH4ErTEBhAczloBfXA9xOftPU6VEr+ejZB2HpuXNKB6Fyfe2Gt6FdtevhpzmtrAlPheNbOnqAyEcyUE/v84RTnyUFKVxLaTA6glRnnkVz6Nzl85HTP0VwzbaGqNf4JrexKYp51iwXoSOzBnp7BHSFyEDdbDu8o6xRpKK8beoVtyV4nGAwNZxOPB30SeEJXkk6v9PqzLac82M9eb5ZQ6ncv7SkIBAVXUMsGqoMtCp7vNDa0MXrYG+0ecSNBs99U8HMpxr0FaIapPDwi3J7GYBFs5oMW3FXZ+BaRKfhPtZZVnszVqX6mIlacWD8lBZyw8T0YTslYt5CqrfBZNQ99vqNxYquUXyELhUqrryZwnNGSroCpcEMKufauRN0gNdTP8o6bpLHCA/+vmkM0ANMwZ4nAbJ1SfbbViqyN77sTQtSTzaRKu0O+bo=";
 
+/**
+ * Scandit SparkScan Hook
+ * 
+ * Configuration based on documentation:
+ * - Scanning Behavior: Continuous (scan barcodes consecutively)
+ * - Preview Behavior: Persistent (camera stays visible)
+ * - Custom Trigger: Hide default button, use our own controls
+ */
 export const useScandit = (onScan) => {
     const [isReady, setIsReady] = useState(false);
-    const [isScanning, setIsScanning] = useState(false);
+    const [isActive, setIsActive] = useState(false);
+
     const contextRef = useRef(null);
     const sparkScanRef = useRef(null);
     const viewRef = useRef(null);
     const onScanRef = useRef(onScan);
 
+    // Keep callback reference updated
     useEffect(() => {
         onScanRef.current = onScan;
     }, [onScan]);
 
-    // Initialize Scandit once
+    // Initialize Scandit SDK once on mount
     useEffect(() => {
-        const init = async () => {
+        const initializeScandit = async () => {
             try {
-                const ctx = await DataCaptureContext.forLicenseKey(LICENSE_KEY, {
+                // 1. Create Data Capture Context
+                const context = await DataCaptureContext.forLicenseKey(LICENSE_KEY, {
                     libraryLocation: "https://cdn.jsdelivr.net/npm/@scandit/web-datacapture-barcode@latest/sdc-lib/",
                     moduleLoaders: [barcodeCaptureLoader()],
                 });
 
+                // 2. Configure SparkScan Settings
                 const settings = new SparkScanSettings();
                 settings.enableSymbologies([Symbology.Code128]);
 
+                // 3. Create SparkScan instance
                 const sparkScan = SparkScan.forSettings(settings);
+
+                // 4. Add scan listener
                 sparkScan.addListener({
                     didScan: (_, session) => {
                         const barcode = session.newlyRecognizedBarcode;
@@ -53,73 +68,121 @@ export const useScandit = (onScan) => {
                     },
                 });
 
-                contextRef.current = ctx;
+                contextRef.current = context;
                 sparkScanRef.current = sparkScan;
                 setIsReady(true);
+                console.log("Scandit SDK initialized successfully");
             } catch (error) {
-                console.error("Scandit Init Error:", error);
+                console.error("Scandit initialization error:", error);
             }
         };
-        init();
 
+        initializeScandit();
+
+        // Cleanup on unmount
         return () => {
             if (viewRef.current) {
                 viewRef.current.stopScanning();
                 viewRef.current.detach();
+                viewRef.current = null;
             }
         };
     }, []);
 
-    const startScanning = useCallback(async (container) => {
-        if (!isReady || !container) return;
+    /**
+     * Mount the SparkScan view to a container element
+     */
+    const mountScanner = useCallback((container) => {
+        if (!isReady || !container || viewRef.current) return;
 
-        // Create the view only once
-        if (!viewRef.current) {
-            const viewSettings = new SparkScanViewSettings();
-            viewSettings.scanningBehavior = SparkScanScanningBehavior.Continuous;
-            viewSettings.holdToScanEnabled = false;
+        // Configure View Settings
+        const viewSettings = new SparkScanViewSettings();
 
-            // Set default scanning mode with PERSISTENT preview to keep camera open
-            viewSettings.defaultScanningMode = new SparkScanScanningModeDefault(
-                SparkScanPreviewBehavior.Persistent
-            );
+        // CONTINUOUS: Scan barcodes consecutively without stopping
+        viewSettings.scanningBehavior = SparkScanScanningBehavior.Continuous;
 
-            const view = SparkScanView.forElement(
-                container,
-                contextRef.current,
-                sparkScanRef.current,
-                viewSettings
-            );
+        // Disable hold-to-scan - we control with custom buttons
+        viewSettings.holdToScanEnabled = false;
 
-            // Hide the default trigger button - we use our own
-            view.triggerButtonVisible = false;
-            view.feedbackDelegate = {
-                getFeedbackForBarcode: () => new SparkScanBarcodeSuccessFeedback(),
-            };
+        // PERSISTENT preview: Camera stays visible, doesn't fade after scan
+        viewSettings.defaultScanningMode = new SparkScanScanningModeDefault(
+            SparkScanPreviewBehavior.Persistent
+        );
 
-            viewRef.current = view;
-        }
+        // Create the SparkScan View
+        const view = SparkScanView.forElement(
+            container,
+            contextRef.current,
+            sparkScanRef.current,
+            viewSettings
+        );
+
+        // Hide default trigger button - we use our own UI controls
+        view.triggerButtonVisible = false;
+
+        // Provide success feedback for each scan
+        view.feedbackDelegate = {
+            feedbackForBarcode: () => new SparkScanBarcodeSuccessFeedback(),
+        };
+
+        viewRef.current = view;
+        console.log("SparkScan view mounted");
+    }, [isReady]);
+
+    /**
+     * Start scanning - call after mounting
+     */
+    const startScanning = useCallback(async () => {
+        if (!viewRef.current) return;
 
         await viewRef.current.prepareScanning();
         await viewRef.current.startScanning();
-        setIsScanning(true);
-    }, [isReady]);
-
-    const stopScanning = useCallback(async () => {
-        if (viewRef.current) {
-            await viewRef.current.pauseScanning();
-        }
-        setIsScanning(false);
+        setIsActive(true);
+        console.log("Scanning started");
     }, []);
 
-    const closeScanner = useCallback(async () => {
-        if (viewRef.current) {
-            await viewRef.current.stopScanning();
-            viewRef.current.detach();
-            viewRef.current = null;
-        }
-        setIsScanning(false);
+    /**
+     * Pause scanning - camera stays visible but stops detecting
+     */
+    const pauseScanning = useCallback(async () => {
+        if (!viewRef.current) return;
+
+        await viewRef.current.pauseScanning();
+        setIsActive(false);
+        console.log("Scanning paused");
     }, []);
 
-    return { isReady, isScanning, startScanning, stopScanning, closeScanner };
+    /**
+     * Resume scanning after pause
+     */
+    const resumeScanning = useCallback(async () => {
+        if (!viewRef.current) return;
+
+        await viewRef.current.startScanning();
+        setIsActive(true);
+        console.log("Scanning resumed");
+    }, []);
+
+    /**
+     * Stop and detach the scanner completely
+     */
+    const unmountScanner = useCallback(async () => {
+        if (!viewRef.current) return;
+
+        await viewRef.current.stopScanning();
+        viewRef.current.detach();
+        viewRef.current = null;
+        setIsActive(false);
+        console.log("SparkScan view unmounted");
+    }, []);
+
+    return {
+        isReady,
+        isActive,
+        mountScanner,
+        startScanning,
+        pauseScanning,
+        resumeScanning,
+        unmountScanner
+    };
 };

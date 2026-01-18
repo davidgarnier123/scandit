@@ -9,16 +9,10 @@ function App() {
     const saved = localStorage.getItem('inventory');
     return saved ? JSON.parse(saved) : [];
   });
-  const [scannerVisible, setScannerVisible] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
   const containerRef = useRef(null);
 
-  // Use a ref to store inventory for the scan handler to avoid re-renders
-  const inventoryRef = useRef(inventory);
-  useEffect(() => {
-    inventoryRef.current = inventory;
-  }, [inventory]);
-
-  // Stable scan handler that doesn't cause re-renders during scanning
+  // Scan handler - stable reference
   const handleScan = useCallback((barcode) => {
     if (navigator.vibrate) navigator.vibrate(100);
 
@@ -30,33 +24,48 @@ function App() {
     });
   }, []);
 
-  const { isReady, isScanning, startScanning, stopScanning, closeScanner } = useScandit(handleScan);
+  const {
+    isReady,
+    isActive,
+    mountScanner,
+    startScanning,
+    pauseScanning,
+    resumeScanning,
+    unmountScanner
+  } = useScandit(handleScan);
 
-  const openScanner = async () => {
-    setScannerVisible(true);
-    // Wait for React to render the container
-    requestAnimationFrame(async () => {
-      if (containerRef.current) {
-        await startScanning(containerRef.current);
-      }
-    });
-  };
+  // Open scanner: mount then start
+  const openScanner = useCallback(async () => {
+    setScannerOpen(true);
+  }, []);
 
-  const handleCloseScanner = async () => {
-    await closeScanner();
-    setScannerVisible(false);
-  };
-
-  const togglePause = async () => {
-    if (isScanning) {
-      await stopScanning();
-    } else {
-      if (containerRef.current) {
-        await startScanning(containerRef.current);
-      }
+  // Effect to mount and start scanner when container is ready
+  useEffect(() => {
+    if (scannerOpen && containerRef.current && isReady) {
+      mountScanner(containerRef.current);
+      // Small delay to ensure mount is complete
+      setTimeout(() => {
+        startScanning();
+      }, 100);
     }
-  };
+  }, [scannerOpen, isReady, mountScanner, startScanning]);
 
+  // Close scanner: stop and unmount
+  const closeScanner = useCallback(async () => {
+    await unmountScanner();
+    setScannerOpen(false);
+  }, [unmountScanner]);
+
+  // Toggle pause/resume
+  const togglePause = useCallback(async () => {
+    if (isActive) {
+      await pauseScanning();
+    } else {
+      await resumeScanning();
+    }
+  }, [isActive, pauseScanning, resumeScanning]);
+
+  // Clear inventory
   const clearInventory = () => {
     if (window.confirm('Vider l\'inventaire ?')) {
       setInventory([]);
@@ -66,17 +75,17 @@ function App() {
 
   return (
     <>
-      {/* Scanner fullscreen - ALWAYS mounted, visibility controlled by CSS */}
-      <div className={`scanner-fullscreen ${scannerVisible ? 'visible' : ''}`}>
+      {/* Scanner View - always in DOM, visibility controlled by CSS */}
+      <div className={`scanner-fullscreen ${scannerOpen ? 'visible' : ''}`}>
         <div className="scanner-container" ref={containerRef}></div>
 
-        {/* Control bar at the bottom */}
+        {/* Bottom controls */}
         <div className="scanner-controls">
           <button className="scanner-btn pause" onClick={togglePause}>
-            {isScanning ? <Pause size={24} /> : <Play size={24} />}
-            <span>{isScanning ? 'PAUSE' : 'REPRENDRE'}</span>
+            {isActive ? <Pause size={24} /> : <Play size={24} />}
+            <span>{isActive ? 'PAUSE' : 'REPRENDRE'}</span>
           </button>
-          <button className="scanner-btn close" onClick={handleCloseScanner}>
+          <button className="scanner-btn close" onClick={closeScanner}>
             <X size={24} />
             <span>FERMER</span>
           </button>
@@ -85,7 +94,7 @@ function App() {
         {/* Scanned items overlay */}
         <div className="scanner-results">
           <div className="results-header">
-            <span>{inventory.length} article{inventory.length !== 1 ? 's' : ''}</span>
+            <span>{inventory.length} article{inventory.length !== 1 ? 's' : ''} scanné{inventory.length !== 1 ? 's' : ''}</span>
           </div>
           <div className="results-list">
             {inventory.slice(0, 5).map((item) => (
@@ -98,8 +107,8 @@ function App() {
         </div>
       </div>
 
-      {/* Home view with inventory list */}
-      <div className={`app-container ${scannerVisible ? 'hidden' : ''}`}>
+      {/* Home View */}
+      <div className={`app-container ${scannerOpen ? 'hidden' : ''}`}>
         <ReloadPrompt />
 
         <header className="header">
@@ -133,11 +142,7 @@ function App() {
         </main>
 
         <div className="fab-container">
-          <button
-            className="fab"
-            onClick={openScanner}
-            disabled={!isReady}
-          >
+          <button className="fab" onClick={openScanner} disabled={!isReady}>
             <Camera size={24} />
             <span>SCANNER</span>
           </button>
