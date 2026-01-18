@@ -67,6 +67,8 @@ export const useScandit = (onScan) => {
         const viewSettings = new SparkScanViewSettings();
         // Force continuous scanning behavior
         viewSettings.scanningBehavior = SparkScanScanningBehavior.Continuous;
+        // Disable hold-to-scan so a tap starts a continuous session
+        viewSettings.holdToScanEnabled = false;
         // Enable the button to switch behavior just in case
         viewSettings.scanningBehaviorButtonVisible = true;
 

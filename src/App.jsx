@@ -49,10 +49,16 @@ function App() {
   return (
     <div className="app-container">
       <header className="header">
-        <h1>Scandit Inventory</h1>
+        <h1 style={{
+          fontSize: '1.25rem',
+          fontWeight: '700',
+          background: 'linear-gradient(135deg, #fff 0%, #a78bfa 100%)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent'
+        }}>Scandit Inventory</h1>
         {inventory.length > 0 && (
-          <button className="btn-clear" onClick={clearInventory}>
-            <Trash2 size={16} />
+          <button className="btn-clear" onClick={clearInventory} title="Vider l'inventaire">
+            <Trash2 size={18} />
           </button>
         )}
       </header>
@@ -62,7 +68,7 @@ function App() {
           <div className="empty-state">
             <Package />
             <p>Aucun article scanné</p>
-            <p style={{ fontSize: '0.8rem', marginTop: '0.5rem' }}>Commencez par scanner un code-barres 128</p>
+            <p style={{ fontSize: '0.8rem', marginTop: '0.5rem', opacity: 0.6 }}>Tapez sur SCANNER pour commencer</p>
           </div>
         ) : (
           inventory.map((item, index) => (
@@ -74,12 +80,14 @@ function App() {
               <div className="symbology">
                 <span style={{
                   fontSize: '0.7rem',
-                  padding: '2px 6px',
-                  background: 'rgba(139, 92, 246, 0.2)',
-                  borderRadius: '4px',
-                  color: 'var(--primary-hover)'
+                  padding: '4px 8px',
+                  background: 'rgba(139, 92, 246, 0.15)',
+                  borderRadius: '6px',
+                  color: '#a78bfa',
+                  fontWeight: '600',
+                  border: '1px solid rgba(139, 92, 246, 0.2)'
                 }}>
-                  {item.symbology.toUpperCase()}
+                  {item.symbology.replace('sy-', '').toUpperCase()}
                 </span>
               </div>
             </div>
@@ -90,7 +98,7 @@ function App() {
       {!isScanning && (
         <div className="scan-controls">
           <button className="btn-scan" onClick={startScanning}>
-            <Camera size={20} />
+            <Camera size={22} />
             SCANNER
           </button>
         </div>
@@ -101,16 +109,19 @@ function App() {
           <button
             onClick={stopScanning}
             style={{
-              background: 'rgba(255,255,255,0.1)',
-              border: 'none',
+              background: 'rgba(255,255,255,0.15)',
+              border: '1px solid rgba(255,255,255,0.2)',
               color: 'white',
-              padding: '10px 20px',
-              borderRadius: '8px',
-              backdropFilter: 'blur(10px)',
-              cursor: 'pointer'
+              padding: '12px 24px',
+              borderRadius: '12px',
+              backdropFilter: 'blur(16px)',
+              WebkitBackdropFilter: 'blur(16px)',
+              cursor: 'pointer',
+              fontWeight: '600',
+              fontSize: '0.9rem'
             }}
           >
-            FERMER
+            FERMER LE SCANNER
           </button>
         </div>
       )}
