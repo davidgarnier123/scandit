@@ -109,8 +109,8 @@ export const useScandit = (onScan) => {
             SparkScanPreviewBehavior.Persistent
         );
 
-        // DISABLE inactivity timeout: -1 means infinite (no auto-stop)
-        viewSettings.inactiveStateTimeout = -1;
+        // Set a very high timeout (1 hour in seconds) instead of -1
+        viewSettings.inactiveStateTimeout = 3600;
 
         // Create the SparkScan View
         const view = SparkScanView.forElement(
@@ -122,6 +122,9 @@ export const useScandit = (onScan) => {
 
         // Hide default trigger button - we use our own UI controls
         view.triggerButtonVisible = false;
+
+        // Hide the preview close button to prevent accidental closing
+        view.previewCloseControlVisible = false;
 
         // Provide success feedback for each scan
         view.feedbackDelegate = {
