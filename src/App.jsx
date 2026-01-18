@@ -11,12 +11,24 @@ function App() {
   const [isScanning, setIsScanning] = useState(false);
   const [activeView, setActiveView] = useState(null);
 
+  const [lastScannedId, setLastScannedId] = useState(null);
+
   const handleScan = (barcode) => {
+    // Haptic feedback for mobile
+    if (navigator.vibrate) {
+      navigator.vibrate(100);
+    }
+
+    const newItem = { ...barcode, id: Date.now() };
     setInventory(prev => {
-      const newList = [barcode, ...prev];
+      const newList = [newItem, ...prev];
       localStorage.setItem('inventory', JSON.stringify(newList));
       return newList;
     });
+
+    setLastScannedId(newItem.id);
+    // Remove highlight after animation
+    setTimeout(() => setLastScannedId(null), 1000);
   };
 
   const { createView } = useScandit(handleScan);
@@ -71,23 +83,27 @@ function App() {
             <p style={{ fontSize: '0.8rem', marginTop: '0.5rem', opacity: 0.6 }}>Tapez sur SCANNER pour commencer</p>
           </div>
         ) : (
-          inventory.map((item, index) => (
-            <div key={index} className="inventory-card">
+          inventory.map((item) => (
+            <div
+              key={item.id || item.timestamp}
+              className={`inventory-card ${lastScannedId === item.id ? 'new-item' : ''}`}
+            >
               <div className="info">
                 <h3>{item.data}</h3>
                 <p>{new Date(item.timestamp).toLocaleTimeString()}</p>
               </div>
               <div className="symbology">
                 <span style={{
-                  fontSize: '0.7rem',
-                  padding: '4px 8px',
-                  background: 'rgba(139, 92, 246, 0.15)',
-                  borderRadius: '6px',
+                  fontSize: '0.65rem',
+                  padding: '3px 6px',
+                  background: 'rgba(139, 92, 246, 0.1)',
+                  borderRadius: '5px',
                   color: '#a78bfa',
                   fontWeight: '600',
-                  border: '1px solid rgba(139, 92, 246, 0.2)'
+                  border: '1px solid rgba(139, 92, 246, 0.2)',
+                  textTransform: 'uppercase'
                 }}>
-                  {item.symbology.replace('sy-', '').toUpperCase()}
+                  {item.symbology.replace('sy-', '')}
                 </span>
               </div>
             </div>
@@ -105,23 +121,28 @@ function App() {
       )}
 
       {isScanning && (
-        <div style={{ position: 'fixed', top: '20px', right: '20px', zIndex: 2000 }}>
+        <div style={{
+          position: 'fixed',
+          top: 'calc(env(safe-area-inset-top, 0px) + 20px)',
+          right: '20px',
+          zIndex: 2000
+        }}>
           <button
             onClick={stopScanning}
             style={{
-              background: 'rgba(255,255,255,0.15)',
+              background: 'rgba(0,0,0,0.5)',
               border: '1px solid rgba(255,255,255,0.2)',
               color: 'white',
-              padding: '12px 24px',
-              borderRadius: '12px',
-              backdropFilter: 'blur(16px)',
-              WebkitBackdropFilter: 'blur(16px)',
+              padding: '10px 20px',
+              borderRadius: '10px',
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
               cursor: 'pointer',
               fontWeight: '600',
-              fontSize: '0.9rem'
+              fontSize: '0.85rem'
             }}
           >
-            FERMER LE SCANNER
+            FERMER
           </button>
         </div>
       )}
