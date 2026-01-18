@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Search, Package, Trash2, Camera } from 'lucide-react';
+import React, { useState, useRef, useCallback } from 'react';
+import { Package, Trash2, Camera, X, Pause, Play } from 'lucide-react';
 import { useScandit } from './hooks/useScandit';
 import ReloadPrompt from './ReloadPrompt';
 import './index.css';
@@ -9,16 +9,11 @@ function App() {
     const saved = localStorage.getItem('inventory');
     return saved ? JSON.parse(saved) : [];
   });
-  const [isScanning, setIsScanning] = useState(false);
-  const [activeView, setActiveView] = useState(null);
+  const [scannerVisible, setScannerVisible] = useState(false);
   const containerRef = useRef(null);
 
-  const [lastScannedId, setLastScannedId] = useState(null);
-
-  const handleScan = (barcode) => {
-    if (navigator.vibrate) {
-      navigator.vibrate(100);
-    }
+  const handleScan = useCallback((barcode) => {
+    if (navigator.vibrate) navigator.vibrate(100);
 
     const newItem = { ...barcode, id: Date.now() };
     setInventory(prev => {
@@ -26,63 +21,87 @@ function App() {
       localStorage.setItem('inventory', JSON.stringify(newList));
       return newList;
     });
+  }, []);
 
-    setLastScannedId(newItem.id);
-    setTimeout(() => setLastScannedId(null), 1000);
+  const { isReady, isScanning, startScanning, stopScanning, closeScanner } = useScandit(handleScan);
+
+  const openScanner = async () => {
+    setScannerVisible(true);
+    // Wait for React to render the container
+    setTimeout(async () => {
+      if (containerRef.current) {
+        await startScanning(containerRef.current);
+      }
+    }, 100);
   };
 
-  const { createView } = useScandit(handleScan);
-
-  const startScanning = async () => {
-    if (!containerRef.current) return;
-
-    setIsScanning(true);
-    // Use the ref directly to avoid DOM lookups and stay stable
-    const view = createView(containerRef.current);
-    if (view) {
-      setActiveView(view);
-      await view.prepareScanning();
-      // Hands-Free: Start the scanning loop immediately
-      await view.startScanning();
-    }
+  const handleCloseScanner = async () => {
+    await closeScanner();
+    setScannerVisible(false);
   };
 
-  const stopScanning = async () => {
-    if (activeView) {
-      await activeView.stopScanning();
-      activeView.detach();
-      setActiveView(null);
+  const togglePause = async () => {
+    if (isScanning) {
+      await stopScanning();
+    } else {
+      if (containerRef.current) {
+        await startScanning(containerRef.current);
+      }
     }
-    setIsScanning(false);
   };
 
   const clearInventory = () => {
-    if (window.confirm('Voulez-vous vraiment vider l\'inventaire ?')) {
+    if (window.confirm('Vider l\'inventaire ?')) {
       setInventory([]);
       localStorage.removeItem('inventory');
     }
   };
 
+  // Full-screen scanner view
+  if (scannerVisible) {
+    return (
+      <div className="scanner-fullscreen">
+        <div className="scanner-container" ref={containerRef}></div>
+
+        {/* Control bar at the bottom */}
+        <div className="scanner-controls">
+          <button className="scanner-btn pause" onClick={togglePause}>
+            {isScanning ? <Pause size={24} /> : <Play size={24} />}
+            <span>{isScanning ? 'PAUSE' : 'REPRENDRE'}</span>
+          </button>
+          <button className="scanner-btn close" onClick={handleCloseScanner}>
+            <X size={24} />
+            <span>FERMER</span>
+          </button>
+        </div>
+
+        {/* Scanned items overlay */}
+        <div className="scanner-results">
+          <div className="results-header">
+            <span>{inventory.length} article{inventory.length !== 1 ? 's' : ''}</span>
+          </div>
+          <div className="results-list">
+            {inventory.slice(0, 5).map((item) => (
+              <div key={item.id} className="result-item">
+                <span className="result-data">{item.data}</span>
+                <span className="result-time">{new Date(item.timestamp).toLocaleTimeString()}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Home view with inventory list
   return (
     <div className="app-container">
       <ReloadPrompt />
-      {/* Hidden/Fixed container for Scandit view */}
-      <div
-        id="scandit-container"
-        ref={containerRef}
-        style={{ display: isScanning ? 'block' : 'none' }}
-      ></div>
 
       <header className="header">
-        <h1 style={{
-          fontSize: '1.25rem',
-          fontWeight: '700',
-          background: 'linear-gradient(135deg, #fff 0%, #a78bfa 100%)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent'
-        }}>Scandit Inventory</h1>
+        <h1 className="app-title">Inventaire</h1>
         {inventory.length > 0 && (
-          <button className="btn-clear" onClick={clearInventory} title="Vider l'inventaire">
+          <button className="btn-clear" onClick={clearInventory}>
             <Trash2 size={18} />
           </button>
         )}
@@ -91,32 +110,17 @@ function App() {
       <main className="inventory-list">
         {inventory.length === 0 ? (
           <div className="empty-state">
-            <Package />
-            <p>Aucun article scanné</p>
-            <p style={{ fontSize: '0.8rem', marginTop: '0.5rem', opacity: 0.6 }}>Tapez sur SCANNER pour commencer</p>
+            <Package size={48} />
+            <p>Aucun article</p>
+            <p className="empty-hint">Appuyez sur Scanner pour commencer</p>
           </div>
         ) : (
           inventory.map((item) => (
-            <div
-              key={item.id || item.timestamp}
-              className={`inventory-card ${lastScannedId === item.id ? 'new-item' : ''}`}
-            >
-              <div className="info">
-                <h3>{item.data}</h3>
-                <p>{new Date(item.timestamp).toLocaleTimeString()}</p>
-              </div>
-              <div className="symbology">
-                <span style={{
-                  fontSize: '0.65rem',
-                  padding: '3px 6px',
-                  background: 'rgba(139, 92, 246, 0.1)',
-                  borderRadius: '5px',
-                  color: '#a78bfa',
-                  fontWeight: '600',
-                  border: '1px solid rgba(139, 92, 246, 0.2)',
-                  textTransform: 'uppercase'
-                }}>
-                  {item.symbology.replace('sy-', '')}
+            <div key={item.id} className="inventory-card">
+              <div className="card-content">
+                <span className="card-data">{item.data}</span>
+                <span className="card-meta">
+                  {item.symbology.replace('sy-', '').toUpperCase()} • {new Date(item.timestamp).toLocaleTimeString()}
                 </span>
               </div>
             </div>
@@ -124,44 +128,18 @@ function App() {
         )}
       </main>
 
-      {!isScanning && (
-        <div className="scan-controls">
-          <button className="btn-scan" onClick={startScanning}>
-            <Camera size={22} />
-            SCANNER
-          </button>
-        </div>
-      )}
-
-      {isScanning && (
-        <div style={{
-          position: 'fixed',
-          top: 'calc(env(safe-area-inset-top, 0px) + 20px)',
-          right: '20px',
-          zIndex: 2000
-        }}>
-          <button
-            onClick={stopScanning}
-            style={{
-              background: 'rgba(0,0,0,0.5)',
-              border: '1px solid rgba(255,255,255,0.2)',
-              color: 'white',
-              padding: '10px 20px',
-              borderRadius: '10px',
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
-              cursor: 'pointer',
-              fontWeight: '600',
-              fontSize: '0.85rem'
-            }}
-          >
-            FERMER
-          </button>
-        </div>
-      )}
+      <div className="fab-container">
+        <button
+          className="fab"
+          onClick={openScanner}
+          disabled={!isReady}
+        >
+          <Camera size={24} />
+          <span>SCANNER</span>
+        </button>
+      </div>
     </div>
   );
 }
 
 export default App;
-
