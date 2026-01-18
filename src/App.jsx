@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from 'react';
 import { Search, Package, Trash2, Camera } from 'lucide-react';
 import { useScandit } from './hooks/useScandit';
 import ReloadPrompt from './ReloadPrompt';
