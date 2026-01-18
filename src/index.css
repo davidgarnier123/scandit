@@ -159,7 +159,20 @@ body {
   inset: 0;
   background: black;
   z-index: 1000;
+  /* Hidden by default */
+  display: none;
+  pointer-events: none;
 }
+
+.scanner-fullscreen.visible {
+  display: block;
+  pointer-events: auto;
+}
+
+.app-container.hidden {
+  display: none;
+}
+
 
 .scanner-container {
   position: absolute;
